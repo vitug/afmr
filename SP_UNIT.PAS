@@ -1,13 +1,14 @@
 {************************************************************}
 {                                                            }
-{                 Модуль ХХХ                                 }
-{       Copyright (c) 2001  ООО ХХХХ                         }
-{               отдел/сектор                                 }
+{                 Модуль sp_unit                             }
+{       Copyright (c) 2000-2016                              }
+{               RSMUV                                        }
 {                                                            }
-{  Разработчик: ХХ ХХ                                        }
-{  Модифицирован: 25 июня 2001                               }
+{  Developer: Vasiliy Tugarinov                              }
+{  Modification:  december 2016                              }
 {                                                            }
 {************************************************************}
+//Antiferromagnetic resonance spectrometer controller
 Unit sp_unit;
 
 Interface
