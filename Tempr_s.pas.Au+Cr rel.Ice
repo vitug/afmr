@@ -1,0 +1,179 @@
+{************************************************************}
+{                                                            }
+{                 Модуль ХХХ                                 }
+{       Copyright (c) 2001  ООО ХХХХ                         }
+{               отдел/сектор                                 }
+{                                                            }
+{  Разработчик: ХХ ХХ                                        }
+{  Модифицирован: 25 июня 2001                               }
+{                                                            }
+{************************************************************}
+Unit tempr_s;
+
+interface
+
+uses
+  inp_reg, basic,
+  SysUtils;
+
+const
+
+  //золото-хромель относительно термостата
+  //UliquidHelium = 6162;
+  //UliquidNitrogen = 5029
+
+  //медь-золото
+  //UliquidHelium = 1571;
+  //UliquidNitrogen = 801.139;
+
+  //золото-хромель относительно льда
+  UliquidNitrogen = 3962.5;
+  UliquidHelium = 5095;
+
+  TliquidHelium = 4.2;
+  TliquidNitrogen = 77.2;
+
+type
+    PTemperatureSensor = ^TemperatureSensor;
+    TemperatureSensor = class
+    private
+      FIR: PTInputRegistry;
+      FTemperature: real;//температура
+      FU: real;
+      FUnorm: real;
+      FControlPoint: Real;//контрольная тока:гелий или азот
+      FThreshold: real;//порог сенсора
+    protected
+      procedure Measure;
+      Procedure Normalize;
+    public
+      constructor Init;
+      Procedure Calibrate(TempCP: real);//калибровка
+      function GetTemp: real; virtual;
+      function isData: boolean;
+      function isReady: boolean;
+      function UnderThreshold: boolean;//возвращает да если ниже порога
+      destructor Done; virtual;
+      property Threshold: real read FThreshold write FThreshold;
+      property U: real read FU write FU;
+    end;
+
+implementation
+
+//==================================================
+
+constructor TemperatureSensor.Init;
+begin
+  New(FIR);
+  FIR^ := TInputRegistry.Init(SiteInputReg);
+  FU := 0;
+  FThreshold := 5;
+  FTemperature := 0;
+  FControlPoint := UliquidHelium;
+  FUnorm := UliquidHelium;
+end;
+
+//--------------------------------------------------
+
+function TemperatureSensor.UnderThreshold: boolean;
+begin
+  Result := (FTemperature <= FThreshold);
+end;
+
+//--------------------------------------------------
+
+procedure TemperatureSensor.Measure;
+var
+  Mantissa: longint;
+  Data,Sign: longint;
+begin
+  Data := (FIR^.ReadData(TempSensorInput));
+  Mantissa := (Data and $FFFF);
+  if ((Data and $F0000) = $80000) then
+    Sign := -1
+  else
+    Sign := 1;
+    FU := Sign * BinDectoBin(not Mantissa) * 1E-6;
+end;
+
+//--------------------------------------------------
+
+function TemperatureSensor.GetTemp: real;
+var
+  x: real;
+begin
+  Measure;
+  x := FU * 1e6 / FUnorm * FControlPoint;
+
+  {//медь-золото
+  if x >= 1028 then
+    FTemperature := (141.89235 + 0.04447 * x - 2.96321E-4
+      * x * x + 2.11799E-7 * x * x * x - 4.88366E-11 * x * x * x * x)
+  else
+    FTemperature := 273.63571 - 0.45946 * x + 4.69695e-4 * x * x -
+      3.42087e-7 * x * x * x + 1.11405e-10 * x * x * x * x;
+    Result := FTemperature;}
+
+  //золото-хромель
+  //относительно термостата
+  //FTemperature:=(309.80746 - 0.03163*X - 2.91483E-6*X*X);
+  //относительно льда
+  FTemperature:=(273 - 0.03771*X - 2.95307E-6*X*X);
+  Result:=FTemperature;
+
+end;
+
+//--------------------------------------------------
+
+function TemperatureSensor.isData: boolean;
+begin
+  if (FIR^.NoData) then
+  begin
+    isData := False;
+    FIR^.NoData := False;
+  end
+  else
+    Result := True;
+end;
+
+//--------------------------------------------------
+
+function TemperatureSensor.isReady: boolean;
+begin
+  if (FIR^.Ready) then
+    isReady := True
+  else
+    Result := False;
+end;
+
+//--------------------------------------------------
+
+procedure TemperatureSensor.Normalize;
+begin
+  Measure;
+  if FU <> 0 then
+    FUnorm := FU * 1e6;
+end;
+
+//--------------------------------------------------
+
+procedure TemperatureSensor.Calibrate(TempCP: real);
+begin
+  if (TempCP = TliquidHelium) then
+    FControlPoint := UliquidHelium
+  else
+    if TempCP = TliquidNitrogen then
+      FControlPoint := UliquidNitrogen;
+  Normalize;
+end;
+
+//--------------------------------------------------
+
+destructor TemperatureSensor.Done;
+begin
+  Dispose(FIR);
+end;
+
+//==================================================
+
+end.{unit temp_s}
